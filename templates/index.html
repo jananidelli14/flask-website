@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FibroGuide AI Chatbot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1> 🩺 FibroGuide: IPF Chatbot</h1>
+        
+        <div class="instructions">
+            <p><strong>Welcome!</strong> This is a Hybrid AI system. Ask a general question, or submit structured data for an XAI analysis.</p>
+            <p><strong>XAI Analysis:</strong> Enter patient data in a single, simple English sentence. The AI will extract the features.</p>
+            <p><strong>Disclaimer:</strong>This tool is for informational purposes only. Consult a healthcare provider for medical advice.</p>
+            <p><strong>Example Input for Analysis:</strong></p>
+            <p><strong>Example Input for Analysis:</strong></p>
+            <pre class="example-input">"Patient is 72, takes 6 medications including Pantoprazole and Pirfenidone. Gut data shows Bacteroides 0.25 and Firmicutes 0.50, and Metabolite A is 12.5."</pre>
+        </div>
+        
+        <div id="chat-window">
+            <div class="message bot-message initial-message">
+                Hello! I'm FibroGuide, your Clinical Decision Support Assistant. How can I assist with IPF data or answer a question today?
+            </div>
+        </div>
+
+        <div class="input-area">
+            <textarea id="user-input" placeholder="Enter your query or patient data..."></textarea>
+            <button onclick="sendQuery()">Send</button>
+        </div>
+        
+    </div>
+
+    <script>
+        // Function to scroll the chat window to the bottom
+        function scrollToBottom() {
+            const chatWindow = document.getElementById('chat-window');
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        // Function to add a message to the chat window
+        function addMessage(sender, content, isReport = false) {
+            const chatWindow = document.getElementById('chat-window');
+            const messageDiv = document.createElement('div');
+            
+            // Determine the correct CSS class based on the sender
+            if (sender === 'user') {
+                messageDiv.className = 'message user-message';
+                messageDiv.innerText = content;
+            } else if (isReport) {
+                // For the XAI analysis report, we use the specialized card class
+                messageDiv.className = 'message report-card';
+                // InnerHTML is used here to allow the HTML formatting from Flask (<span>, <p>, etc.)
+                messageDiv.innerHTML = content;
+            } else {
+                // For general conversation, use the standard bot bubble
+                messageDiv.className = 'message bot-message';
+                messageDiv.innerText = content;
+            }
+            
+            chatWindow.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        async function sendQuery() {
+            const inputElement = document.getElementById('user-input');
+            const query = inputElement.value.trim();
+
+            if (!query) return;
+            
+            // 1. Add user message to the chat window
+            addMessage('user', query);
+            
+            // 2. Clear the input box
+            inputElement.value = '';
+
+            // 3. Add a temporary processing message
+            addMessage('bot', "Processing request... (Analysis may take a few seconds)");
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const data = await response.json();
+                
+                // Remove the temporary 'Processing request...' message
+                const chatWindow = document.getElementById('chat-window');
+                chatWindow.removeChild(chatWindow.lastChild); 
+
+                if (response.ok) {
+                    // Check if the response contains the analysis header to determine if it's a report
+                    const isReport = data.response.includes("FibroGuide XAI Analysis Report");
+                    
+                    addMessage('bot', data.response, isReport);
+
+                } else {
+                    // Display error message as a standard bot bubble
+                    addMessage('bot', '❌ ERROR: ' + (data.error || data.response));
+                }
+
+            } catch (error) {
+                console.error('Network or Fetch Error:', error);
+                addMessage('bot', '❌ FATAL ERROR: Could not connect to the Flask server. Check the console.');
+            }
+        }
+    </script>
+</body>
+</html>
